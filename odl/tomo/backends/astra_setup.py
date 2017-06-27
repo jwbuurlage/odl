@@ -503,6 +503,8 @@ def astra_data(astra_geom, datatype, data=None, ndim=2, allow_copy=False):
     if datatype == 'volume':
         astra_dtype_str = '-vol'
     elif datatype == 'projection':
+        astra.data3d.change_geometry(1, astra_geom)
+        return 1
         astra_dtype_str = '-sino'
     else:
         raise ValueError('`datatype` {!r} not understood'.format(datatype))

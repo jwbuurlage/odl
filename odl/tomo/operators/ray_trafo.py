@@ -16,6 +16,7 @@ from builtins import str, super
 
 import numpy as np
 import warnings
+import time
 
 from odl.discr import DiscreteLp
 from odl.operator import Operator
@@ -488,6 +489,7 @@ class RayBackProjection(RayTransformBase):
                                                 self.range.real_space,
                                                 out_real)
             elif data_impl == 'cuda':
+                time_at_start = time.time()
                 if self._astra_wrapper is None:
                     astra_wrapper = AstraCudaBackProjectorImpl(
                         self.geometry, self.range.real_space,
@@ -496,6 +498,8 @@ class RayBackProjection(RayTransformBase):
                         self._astra_wrapper = astra_wrapper
                 else:
                     astra_wrapper = self._astra_wrapper
+                time_at_end = time.time()
+                print("wrapper setup time", time_at_end - time_at_start)
 
                 return astra_wrapper.call_backward(x_real, out_real)
             else:

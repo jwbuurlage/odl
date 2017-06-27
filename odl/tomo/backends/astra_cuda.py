@@ -30,6 +30,8 @@ from odl.tomo.geometry import (
     Geometry, Parallel2dGeometry, FanFlatGeometry, Parallel3dAxisGeometry,
     HelicalConeFlatGeometry)
 
+import time
+
 
 __all__ = ('ASTRA_CUDA_AVAILABLE',
            'AstraCudaProjectorImpl', 'AstraCudaBackProjectorImpl')
@@ -100,8 +102,8 @@ class AstraCudaProjectorImpl(object):
         if self.geometry.ndim == 2:
             out[:] = self.out_array
         elif self.geometry.ndim == 3:
-            out[:] = np.rollaxis(self.out_array, 0, 3).reshape(
-                self.proj_space.shape)
+            out[:] = self.out_array # np.rollaxis(self.out_array, 0, 3).reshape(
+                # self.proj_space.shape)
 
         # Fix scaling to weight by pixel size
         if isinstance(self.geometry, Parallel2dGeometry):
@@ -174,7 +176,7 @@ class AstraCudaProjectorImpl(object):
             adata.delete(self.sino_id)
             self.sino_id = None
         if self.proj_id is not None:
-            aproj.delete(self.proj_id)
+            #aproj.delete(self.proj_id)
             self.proj_id = None
 
 
@@ -231,13 +233,17 @@ class AstraCudaBackProjectorImpl(object):
         if self.geometry.ndim == 2:
             astra.data2d.store(self.sino_id, proj_data.asarray())
         elif self.geometry.ndim == 3:
-            shape = (-1,) + self.geometry.det_partition.shape
-            reshaped_proj_data = proj_data.asarray().reshape(shape)
-            swapped_proj_data = np.rollaxis(reshaped_proj_data, 2, 0)
-            astra.data3d.store(self.sino_id, swapped_proj_data)
+            #shape = (-1,) + self.geometry.det_partition.shape
+            #reshaped_proj_data = proj_data.asarray().reshape(shape)
+            #swapped_proj_data = reshaped_proj_data # np.rollaxis(reshaped_proj_data, 2, 0)
+            #astra.data3d.store(self.sino_id, swapped_proj_data)
+            pass
 
         # Run algorithm
+        time_at_start = time.time()
         astra.algorithm.run(self.algo_id)
+        time_at_end = time.time()
+        print("algorith time", time_at_end - time_at_start)
 
         # Copy result to CPU memory
         out[:] = self.out_array
@@ -266,8 +272,8 @@ class AstraCudaBackProjectorImpl(object):
             astra_proj_shape = (proj_shape[2], proj_shape[0], proj_shape[1])
             astra_vol_shape = self.reco_space.shape
 
-        self.in_array = np.empty(astra_proj_shape,
-                                 dtype='float32', order='C')
+        self.in_array = np.array([]) # np.empty(astra_proj_shape,
+                                     # dtype='float32', order='C')
         self.out_array = np.empty(astra_vol_shape,
                                   dtype='float32', order='C')
 
@@ -308,7 +314,7 @@ class AstraCudaBackProjectorImpl(object):
             adata.delete(self.vol_id)
             self.vol_id = None
         if self.sino_id is not None:
-            adata.delete(self.sino_id)
+            #adata.delete(self.sino_id)
             self.sino_id = None
         if self.proj_id is not None:
             aproj.delete(self.proj_id)

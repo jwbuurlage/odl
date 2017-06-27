@@ -18,14 +18,39 @@ prototyped below.
 import numpy as np
 import odl
 import time
+import astra
+import pygpu
+import cProfile
+
+
+# Initialize pygpu
+ctx = pygpu.init('cuda')
+pygpu.set_default_context(ctx)
+
+proj_geom = astra.create_proj_geom('cone', 1, 1, 512, 512,
+                                   list(range(512)), 512, 0)
+proj_geom2 = astra.create_proj_geom('cone', 1, 1, 512, 512,
+                                    list(range(512)), 1024, 0)
+proj_gpuarr = pygpu.gpuarray.zeros(
+    astra.functions.geom_size(proj_geom), dtype='float32')
+
+z, y, x = proj_gpuarr.shape
+proj_data_link = astra.data3d.GPULink(proj_gpuarr.gpudata, x, y, z,
+                                      proj_gpuarr.strides[-2])
+proj_id = astra.data3d.link('-sino', proj_geom, proj_data_link)
+astra.data3d.change_geometry(proj_id, proj_geom2)
+
+assert(proj_id == 1)
 
 import sys
-tomop_path = '/export/scratch1/kohr/git/slicevis/ext/tomopackets/python'
+tomop_path = '/ufs/buurlage/code/tomography/tomopackets/python/'
 if tomop_path not in sys.path:
     sys.path.append(tomop_path)
 import tomop
 
 DEBUG = True
+
+astra.log.setOutputScreen(astra.log.STDERR, astra.log.DEBUG)
 
 
 def callback_proto(slice_spec):
@@ -207,11 +232,11 @@ def slice_spec_to_rot_matrix(slice_spec):
 vol_min_pt = np.array([-20, -20, -20], dtype=float)
 vol_extent = [40, 40, 40]
 vol_max_pt = vol_min_pt + vol_extent
-vol_shape = (256, 256, 256)
+vol_shape = (512, 512, 512)
 vol_half_extent = np.array(vol_extent, dtype=float) / 2
 
 # Projection angles
-num_angles = 360
+num_angles = 512
 min_angle = 0
 max_angle = 2 * np.pi
 angle_partition = odl.nonuniform_partition(
@@ -236,7 +261,7 @@ geometry_kwargs_base = {
     'dpart': detector_partition,
     'src_radius': src_radius,
     'det_radius': det_radius
-    }
+}
 geometry_kwargs_full = geometry_kwargs_base.copy()
 geometry_kwargs_full['axis'] = axis
 
@@ -249,7 +274,7 @@ relative_freq_cutoff = 0.8
 slice_min_pt = np.array([-20, -20])
 slice_extent = [40, 40]
 slice_max_pt = slice_min_pt + slice_extent
-slice_shape = (256, 256)
+slice_shape = (512, 512)
 min_val = 0.0
 max_val = 1.0
 
@@ -400,13 +425,14 @@ def callback_fbp(slice_spec):
     ray_trafo_slice = odl.tomo.RayTransform(reco_space_slice, geometry_slice,
                                             impl='astra_cuda')
 
+    adjoint = ray_trafo_slice.adjoint
     time_after_setup = time.time()
     setup_time_ms = 1e3 * (time_after_setup - time_at_start)
     if DEBUG:
         print('time for setup: {:7.3f} ms'.format(setup_time_ms))
 
     # Compute back-projection with this ray transform
-    fbp_reco_slice = ray_trafo_slice.adjoint(proj_data_filtered)
+    fbp_reco_slice = adjoint(proj_data_filtered)
     if DEBUG:
         # fbp_reco_slice.show()
         pass
